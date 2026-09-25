@@ -11,5 +11,16 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ChatRequest {
     private String message;
+    private String conversationId;
     private String sessionId;
+
+    public String getEffectiveConversationId() {
+        if (conversationId != null && !conversationId.isBlank()) {
+            return conversationId;
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            return sessionId;
+        }
+        return "default-conversation";
+    }
 }

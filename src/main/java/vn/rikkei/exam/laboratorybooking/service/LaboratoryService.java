@@ -35,7 +35,6 @@ public class LaboratoryService {
             return "Không tìm thấy loại phòng thí nghiệm: " + resourceType;
         }
 
-        // Lấy danh sách tồn kho
         List<ResourceInventory> inventories = inventoryRepository.findAll().stream()
                 .filter(inv -> inv.getResourceType() != null
                         && inv.getResourceType().getResourceCode().equalsIgnoreCase(resourceType)
@@ -59,13 +58,11 @@ public class LaboratoryService {
     @Transactional
     public String createLaboratoryBookingRequest(String userId, String resourceType, LocalDate startDate,
                                                  LocalDate endDate, int participantCount, String purpose) {
-        // 1. Kiểm tra User
         Optional<AppUser> userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
             return "Lỗi: Không tìm thấy người dùng với ID: " + userId;
         }
 
-        // 2. Kiểm tra ngày
         if (startDate == null || endDate == null || !startDate.isBefore(endDate)) {
             return "Lỗi: startDate phải nhỏ hơn endDate.";
         }
@@ -74,30 +71,25 @@ public class LaboratoryService {
             return "Lỗi: Thời gian đặt phòng tối đa là 14 ngày. Số ngày yêu cầu: " + days;
         }
 
-        // 3. Kiểm tra loại phòng
         Optional<ResourceType> typeOpt = resourceTypeRepository.findById(resourceType);
         if (typeOpt.isEmpty()) {
             return "Lỗi: Không tìm thấy loại phòng thí nghiệm: " + resourceType;
         }
         ResourceType resType = typeOpt.get();
 
-        // 4. Kiểm tra sức chứa
         if (participantCount > resType.getMaxParticipants()) {
             return "Lỗi: Số người tham gia (" + participantCount + ") vượt quá sức chứa tối đa (" + resType.getMaxParticipants() + ") của phòng " + resourceType;
         }
 
-        // 5. Kiểm tra nhóm PREMIUM tối thiểu 2 người
         boolean isPremium = "PRM".equalsIgnoreCase(resourceType) || (resType.getDisplayName() != null && resType.getDisplayName().toLowerCase().contains("premium"));
         if (isPremium && participantCount < 2) {
             return "Lỗi: Phòng nhóm PREMIUM yêu cầu tối thiểu 2 người tham gia.";
         }
 
-        // 6. Kiểm tra purpose 10-200 ký tự
         if (purpose == null || purpose.trim().length() < 10 || purpose.trim().length() > 200) {
             return "Lỗi: Mục đích đặt phòng phải từ 10 đến 200 ký tự.";
         }
 
-        // Tạo request với trạng thái PENDING
         String requestId = "REQ-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         ReservationRequest request = ReservationRequest.builder()
                 .requestId(requestId)
@@ -116,5 +108,46 @@ public class LaboratoryService {
 
         return String.format("Tạo yêu cầu thành công! RequestId: %s | Tóm tắt: Người đặt: %s, Loại phòng: %s (%s), Thời gian: %s đến %s, Số người: %d, Trạng thái: PENDING.",
                 requestId, userOpt.get().getFullName(), resType.getResourceCode(), resType.getDisplayName(), startDate, endDate, participantCount);
+    }
+
+    @Transactional
+    public String approveOrRejectRequest(String requestId, String decision, String note) {
+        Optional<ReservationRequest> reqOpt = requestRepository.findById(requestId);
+        if (reqOpt.isEmpty()) {
+            return "Lỗi: Không tìm thấy yêu cầu đặt phòng với requestId: " + requestId;
+        }
+
+        ReservationRequest request = reqOpt.get();
+        if (request.getStatus() != ReservationStatus.PENDING) {
+            return "Lỗi: Chỉ xử lý yêu cầu ở trạng thái PENDING. Trạng thái hiện tại: " + request.getStatus();
+        }
+
+        if ("APPROVE".equalsIgnoreCase(decision)) {
+            // Tái kiểm tra nghiệp vụ trước APPROVE
+            if (!request.getStartDate().isBefore(request.getEndDate())) {
+                return "Lỗi: startDate không nhỏ hơn endDate.";
+            }
+            long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate());
+            if (days > 14) {
+                return "Lỗi: Vượt quá số ngày cho phép tối đa 14 ngày.";
+            }
+            if (request.getParticipantCount() > request.getResourceType().getMaxParticipants()) {
+                return "Lỗi: Vượt quá sức chứa tối đa.";
+            }
+
+            request.setStatus(ReservationStatus.APPROVED);
+            request.setDecisionNote(note);
+            request.setUpdatedAt(Instant.now());
+            requestRepository.save(request);
+            return "Phê duyệt yêu cầu thành công: " + requestId;
+        } else if ("REJECT".equalsIgnoreCase(decision)) {
+            request.setStatus(ReservationStatus.REJECTED);
+            request.setDecisionNote(note);
+            request.setUpdatedAt(Instant.now());
+            requestRepository.save(request);
+            return "Từ chối yêu cầu thành công: " + requestId;
+        } else {
+            return "Lỗi: Quyết định không hợp lệ. Chỉ chấp nhận APPROVE hoặc REJECT.";
+        }
     }
 }

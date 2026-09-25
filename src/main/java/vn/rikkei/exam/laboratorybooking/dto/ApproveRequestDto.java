@@ -5,15 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChatResponse {
-    private String answer;
-    private String conversationId;
-    private List<String> toolsUsed;
-    private List<String> sources;
+public class ApproveRequestDto {
+    private String requestId;
+    private String decision; // APPROVE hoặc REJECT
+    private String note;
 }

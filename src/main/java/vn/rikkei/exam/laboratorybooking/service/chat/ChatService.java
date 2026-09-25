@@ -27,9 +27,7 @@ public class ChatService {
 
     public ChatResponse chat(ChatRequest request) {
         String userMessage = request.getMessage() != null ? request.getMessage().trim() : "";
-        String sessionId = (request.getSessionId() != null && !request.getSessionId().isBlank())
-                ? request.getSessionId()
-                : "default-session";
+        String conversationId = request.getEffectiveConversationId();
 
         // Reset danh sách tool đã gọi
         laboratoryTools.resetToolsUsed();
@@ -67,7 +65,7 @@ public class ChatService {
                     .user(userMessage)
                     .tools(laboratoryTools)
                     .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                    .advisors(a -> a.param("chat_memory_conversation_id", sessionId))
+                    .advisors(a -> a.param("chat_memory_conversation_id", conversationId))
                     .call()
                     .content();
         } catch (Exception e) {
@@ -84,6 +82,7 @@ public class ChatService {
 
         return ChatResponse.builder()
                 .answer(answer)
+                .conversationId(conversationId)
                 .toolsUsed(toolsUsed)
                 .sources(sources)
                 .build();

@@ -13,16 +13,6 @@ spring:
     hibernate:
       ddl-auto: update
   ai:
-    google:
-      genai:
-        api-key: ${GOOGLE_GENAI_API_KEY:}
-        chat:
-          model: ${GOOGLE_GENAI_CHAT_MODEL:gemini-3-flash-preview}
-        embedding:
-          text:
-            model: ${GOOGLE_GENAI_EMBEDDING_MODEL:gemini-embedding-001}
-            dimensions: ${EMBEDDING_DIMENSIONS:768}
-
     vectorstore:
       pgvector:
         table-name: ${PGVECTOR_TABLE_NAME:vector_store}
